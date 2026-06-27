@@ -1,3 +1,4 @@
+
 # app.py
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 import uuid
@@ -104,6 +105,10 @@ def controller(code):
                          controller_code=code,
                          quiz=quiz,
                          controller=controller)
+
+@app.route('/play')
+def play_page():
+    return render_template('play.html')
 
 @app.route('/api/join', methods=['POST'])
 def join_quiz():
