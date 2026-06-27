@@ -1,0 +1,177 @@
+<!-- templates/dashboard.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard - Quiz Creator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f0f0; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; }
+        .create-btn { background: #4CAF50; color: white; padding: 12px 24px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
+        .create-btn:hover { background: #45a049; }
+        .panel { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .form-group { margin: 20px 0; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; color: #555; }
+        input, select, textarea { width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 14px; }
+        .category-group { background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 10px 0; }
+        .question-item { background: white; padding: 10px; margin: 5px 0; border-radius: 5px; border-left: 3px solid #4CAF50; }
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }
+        .btn-primary { background: #4CAF50; color: white; }
+        .btn-danger { background: #f44336; color: white; }
+        .btn-secondary { background: #666; color: white; }
+        #generated-link { margin-top: 20px; padding: 15px; background: #e8f5e9; border-radius: 8px; display: none; }
+        .domain-input { margin: 20px 0; }
+        .domain-input input { width: 70%; }
+        .domain-input button { width: 28%; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📝 Dashboard Quiz Creatora</h1>
+        </div>
+        
+        <div class="panel">
+            <h2>Stwórz nowy quiz</h2>
+            
+            <div class="domain-input">
+                <label>Domena (opcjonalnie)</label>
+                <input type="text" id="domain" placeholder="np. mojquiz.pl" value="{{ request.host }}">
+                <button onclick="setDomain()" class="btn btn-secondary">Ustaw domenę</button>
+            </div>
+            
+            <div class="form-group">
+                <label>Tytuł quizu</label>
+                <input type="text" id="quiz-title" placeholder="Wpisz tytuł">
+            </div>
+            
+            <div class="form-group">
+                <label>Theme</label>
+                <select id="quiz-theme">
+                    <option value="default">Domyślny</option>
+                    <option value="dark">Ciemny</option>
+                    <option value="neon">Neon</option>
+                    <option value="pastel">Pastel</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Kategorie i pytania</label>
+                <div id="categories-container">
+                    <div class="category-group">
+                        <input type="text" placeholder="Nazwa kategorii" class="category-name" style="margin-bottom:10px;">
+                        <textarea placeholder="Pytania (jedno na linię)" class="category-questions" rows="3"></textarea>
+                        <button onclick="removeCategory(this)" class="btn btn-danger" style="margin-top:5px;">Usuń kategorię</button>
+                    </div>
+                </div>
+                <button onclick="addCategory()" class="btn btn-secondary" style="margin-top:10px;">+ Dodaj kategorię</button>
+            </div>
+            
+            <button onclick="createQuiz()" class="btn btn-primary" style="width:100%; padding:15px; font-size:18px; margin-top:20px;">
+                🚀 Stwórz Quiz
+            </button>
+            
+            <div id="generated-link">
+                <h3>✅ Quiz utworzony!</h3>
+                <p>Link do tablicy:</p>
+                <div style="background:white; padding:10px; border-radius:5px; word-break:break-all;" id="quiz-link"></div>
+                <button onclick="copyLink()" class="btn btn-secondary" style="margin-top:10px;">Kopiuj link</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let categories = [{name: '', questions: []}];
+        
+        function addCategory() {
+            const container = document.getElementById('categories-container');
+            const div = document.createElement('div');
+            div.className = 'category-group';
+            div.innerHTML = `
+                <input type="text" placeholder="Nazwa kategorii" class="category-name" style="margin-bottom:10px;">
+                <textarea placeholder="Pytania (jedno na linię)" class="category-questions" rows="3"></textarea>
+                <button onclick="removeCategory(this)" class="btn btn-danger" style="margin-top:5px;">Usuń kategorię</button>
+            `;
+            container.appendChild(div);
+        }
+        
+        function removeCategory(btn) {
+            const group = btn.parentElement;
+            if (document.querySelectorAll('.category-group').length > 1) {
+                group.remove();
+            } else {
+                alert('Musi być przynajmniej jedna kategoria');
+            }
+        }
+        
+        function setDomain() {
+            const domain = document.getElementById('domain').value;
+            if (domain) {
+                localStorage.setItem('domain', domain);
+                alert('Domena ustawiona: ' + domain);
+            }
+        }
+        
+        function createQuiz() {
+            const title = document.getElementById('quiz-title').value;
+            const theme = document.getElementById('quiz-theme').value;
+            const domain = document.getElementById('domain').value || localStorage.getItem('domain') || window.location.host;
+            
+            if (!title) {
+                alert('Wpisz tytuł quizu');
+                return;
+            }
+            
+            const categoryElements = document.querySelectorAll('.category-group');
+            const categories = [];
+            const questions = {};
+            
+            categoryElements.forEach(el => {
+                const name = el.querySelector('.category-name').value.trim();
+                const qs = el.querySelector('.category-questions').value.split('\n').filter(q => q.trim());
+                if (name && qs.length > 0) {
+                    categories.push(name);
+                    questions[name] = qs;
+                }
+            });
+            
+            if (categories.length === 0) {
+                alert('Dodaj przynajmniej jedną kategorię z pytaniami');
+                return;
+            }
+            
+            const data = {
+                title: title,
+                theme: theme,
+                domain: domain,
+                categories: categories,
+                questions: questions
+            };
+            
+            fetch('/create_quiz', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('quiz-link').textContent = data.link;
+                    document.getElementById('generated-link').style.display = 'block';
+                } else {
+                    alert('Błąd tworzenia quizu');
+                }
+            })
+            .catch(err => alert('Błąd: ' + err));
+        }
+        
+        function copyLink() {
+            const link = document.getElementById('quiz-link').textContent;
+            navigator.clipboard.writeText(link);
+            alert('Link skopiowany!');
+        }
+    </script>
+</body>
+</html>
