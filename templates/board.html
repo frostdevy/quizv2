@@ -1,0 +1,231 @@
+<!-- templates/board.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tablica Quizu</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .board {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        .board::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(102,126,234,0.1) 0%, transparent 70%);
+            animation: rotate 20s linear infinite;
+        }
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .header { position: relative; z-index: 1; text-align: center; margin-bottom: 30px; }
+        .header h1 { color: #333; font-size: 2.5em; }
+        .header .code {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 24px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin: 20px 0;
+            display: inline-block;
+        }
+        .join-info {
+            background: #e8f5e9;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-size: 18px;
+            position: relative;
+            z-index: 1;
+        }
+        .players-list {
+            position: relative;
+            z-index: 1;
+            margin: 20px 0;
+        }
+        .player-item {
+            display: inline-block;
+            background: #f5f5f5;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 20px;
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .game-area {
+            position: relative;
+            z-index: 1;
+            margin-top: 30px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 10px;
+            min-height: 200px;
+        }
+        .countdown {
+            font-size: 48px;
+            text-align: center;
+            padding: 20px;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .question-display {
+            font-size: 24px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .hidden {
+            display: none;
+        }
+        .winner {
+            text-align: center;
+            padding: 30px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 10px;
+            color: white;
+            font-size: 28px;
+            animation: celebrate 0.5s ease-out;
+        }
+        @keyframes celebrate {
+            0% { transform: scale(0); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="board" id="board">
+        <div class="header">
+            <h1>🎯 {{ quiz.title }}</h1>
+            <div class="code">Kod: {{ controller_code }}</div>
+        </div>
+        
+        <div class="join-info">
+            <strong>📱 Dołącz do quizu:</strong> {{ domain }}/play<br>
+            <strong>🔑 Wpisz kod:</strong> {{ controller_code }}
+        </div>
+        
+        <div class="players-list" id="playersList">
+            <h3>👥 Dołączeni gracze:</h3>
+            <div id="playersContainer"></div>
+        </div>
+        
+        <div class="game-area" id="gameArea">
+            <div id="gameContent">
+                <p style="text-align:center; color:#666;">Oczekiwanie na rozpoczęcie przez kontrolera...</p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const quizId = '{{ quiz_id }}';
+        const controllerCode = '{{ controller_code }}';
+        let players = [];
+        let gameState = 'waiting';
+        let countdownInterval = null;
+        
+        function updateBoard() {
+            fetch(`/api/game/state/${controllerCode}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) return;
+                    
+                    // Update players
+                    const container = document.getElementById('playersContainer');
+                    container.innerHTML = data.players.map(p => 
+                        `<div class="player-item">
+                            ${p.avatar || '👤'} ${p.name}
+                            ${data.scores && data.scores[p.id] !== undefined ? `(${data.scores[p.id]} pts)` : ''}
+                            ${data.current_player === p.id ? '⭐' : ''}
+                        </div>`
+                    ).join('');
+                    
+                    // Update game state
+                    const content = document.getElementById('gameContent');
+                    
+                    if (data.state === 'countdown') {
+                        const start = new Date(data.countdown_start);
+                        const elapsed = (new Date() - start) / 1000;
+                        const remaining = Math.max(0, 10 - Math.floor(elapsed));
+                        
+                        if (remaining > 0) {
+                            content.innerHTML = `
+                                <div class="countdown">⏰ ${remaining}</div>
+                                <p style="text-align:center; color:#ff6b6b; font-size:20px; animation:pulse 1s infinite;">
+                                    Ostatnie miejsca! Dołącz szybko! 🏃
+                                </p>
+                            `;
+                        } else {
+                            // Start game
+                            fetch('/api/game/start', {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({code: controllerCode})
+                            });
+                        }
+                    } else if (data.state === 'active') {
+                        if (data.current_question) {
+                            const q = data.current_question;
+                            content.innerHTML = `
+                                <div class="question-display">
+                                    <h3>📚 ${q.category}</h3>
+                                    <p>${q.question}</p>
+                                    ${data.current_player ? 
+                                        `<p style="color:#4CAF50; margin-top:10px;">
+                                            🎯 Odpowiada: ${data.players.find(p => p.id === data.current_player)?.name || ''}
+                                        </p>` : ''
+                                    }
+                                </div>
+                            `;
+                        } else {
+                            content.innerHTML = `<p style="text-align:center;">⏳ Losowanie gracza...</p>`;
+                        }
+                    } else if (data.state === 'finished') {
+                        const winner = data.players.find(p => p.id === data.winner);
+                        content.innerHTML = `
+                            <div class="winner">
+                                🏆 ZWYCIĘZCA: ${winner?.name || 'Nieznany'}!
+                                <p style="font-size:18px; margin-top:10px;">Punkty: ${data.scores[data.winner] || 0}</p>
+                            </div>
+                        `;
+                    }
+                    
+                    gameState = data.state;
+                })
+                .catch(err => console.error('Error:', err));
+        }
+        
+        // Update every 2 seconds
+        setInterval(updateBoard, 2000);
+        updateBoard();
+    </script>
+</body>
+</html>
